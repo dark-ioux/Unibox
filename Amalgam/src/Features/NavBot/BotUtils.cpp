@@ -408,7 +408,8 @@ void CBotUtils::SetSlot(CTFPlayer* pLocal, int iSlot)
 
 void CBotUtils::Run(CTFPlayer* pLocal, CTFWeaponBase* pWeapon, CUserCmd* pCmd)
 {
-	if ((!Vars::Misc::Movement::NavBot::Enabled.Value && !(Vars::Misc::Movement::FollowBot::Enabled.Value && Vars::Misc::Movement::FollowBot::Targets.Value)) ||
+	if ((!Vars::Misc::Movement::NavBot::Enabled.Value && !(Vars::Misc::Movement::FollowBot::Enabled.Value && Vars::Misc::Movement::FollowBot::Targets.Value)
+		&& !Vars::Misc::Movement::KlownBot::Enabled.Value) ||
 		!pLocal->IsAlive() || !pWeapon)
 	{
 		Reset();
@@ -430,6 +431,148 @@ void CBotUtils::Run(CTFPlayer* pLocal, CTFWeaponBase* pWeapon, CUserCmd* pCmd)
 	AutoRev(pLocal, pWeapon, pCmd);
 }
 
+void CBotUtils::RunKlownBot(CTFPlayer* pLocal, CTFWeaponBase* pWeapon, CUserCmd* pCmd)
+{
+	using namespace Vars::Misc::Movement::KlownBot;
+
+	if (!Enabled.Value || !pLocal || !pWeapon || !pCmd || !pLocal->IsAlive() || pLocal->m_iClass() != TF_CLASS_SPY)
+		return;
+
+	auto pTarget = m_tClosestEnemy.m_pPlayer;
+	if (!pTarget || !pTarget->IsAlive() || pTarget->IsDormant())
+		return;
+
+	const float flDistance = pLocal->GetAbsOrigin().DistTo(pTarget->GetAbsOrigin());
+	if (flDistance > CombatRange.Value)
+		return;
+
+	const float flNow = I::GlobalVars->curtime;
+
+	if (ForceKnife.Value && m_iCurrentSlot != SLOT_MELEE)
+		SetSlot(pLocal, SLOT_MELEE);
+
+	if (flNow >= m_tKlownBot.m_flNextMatador)
+	{
+		m_tKlownBot.m_bMatadorRight = !m_tKlownBot.m_bMatadorRight;
+		m_tKlownBot.m_bBackpedal = SDK::RandomInt(1, 15) == 1;
+		m_tKlownBot.m_bDSlide = SDK::RandomInt(0, 1) == 1;
+		m_tKlownBot.m_flNextMatador = flNow + SDK::RandomFloat(0.1f, 0.8f);
+	}
+
+	if (AlwaysAggressive.Value || pTarget->m_iClass() != TF_CLASS_SPY)
+	{
+		m_tKlownBot.m_bAggressive = true;
+	}
+	else if (flNow >= m_tKlownBot.m_flNextAggressive)
+	{
+		m_tKlownBot.m_bAggressive = SDK::RandomInt(0, 1) != 0;
+		m_tKlownBot.m_flNextAggressive = flNow + SDK::RandomFloat(0.2f, 0.3f);
+	}
+
+	if (Headfake.Value && flNow >= m_tKlownBot.m_flNextHeadfake)
+	{
+		m_tKlownBot.m_bHeadfakeRight = !m_tKlownBot.m_bHeadfakeRight;
+		m_tKlownBot.m_flHeadfakeYaw = SDK::RandomFloat(15.f, 30.f);
+		m_tKlownBot.m_flNextHeadfake = flNow + SDK::RandomFloat(0.05f, 0.10f);
+	}
+
+	if (flDistance > 256.f)
+	{
+		pCmd->forwardmove = 320.f;
+		pCmd->sidemove = 0.f;
+	}
+	else if (flDistance > 128.f)
+	{
+		pCmd->forwardmove = 320.f;
+		pCmd->sidemove = m_tKlownBot.m_bMatadorRight ? 320.f : -320.f;
+	}
+	else if (m_tKlownBot.m_bDSlide && flDistance < 100.f)
+	{
+		pCmd->forwardmove = m_tKlownBot.m_bAggressive ? 450.f : -320.f;
+		pCmd->sidemove = m_tKlownBot.m_bMatadorRight ? 450.f : -450.f;
+	}
+	else if (m_tKlownBot.m_bAggressive)
+	{
+		pCmd->forwardmove = flDistance > 70.f ? 320.f : 0.f;
+		pCmd->sidemove = m_tKlownBot.m_bMatadorRight ? 320.f : -320.f;
+	}
+	else if (m_tKlownBot.m_bBackpedal)
+	{
+		pCmd->forwardmove = -320.f;
+		pCmd->sidemove = SDK::RandomInt(0, 1) ? (m_tKlownBot.m_bMatadorRight ? 320.f : -320.f) : 0.f;
+	}
+	else
+	{
+		pCmd->forwardmove = 0.f;
+		pCmd->sidemove = m_tKlownBot.m_bMatadorRight ? 320.f : -320.f;
+	}
+
+	Vec3 vAimPos = pTarget->GetEyePosition();
+	vAimPos.z -= 25.f;
+	Vec3 vWishAngles = Math::CalcAngle(pLocal->GetEyePosition(), vAimPos);
+	if (Headfake.Value && flDistance > 96.f && flDistance < 256.f)
+		vWishAngles.y += m_tKlownBot.m_bHeadfakeRight ? m_tKlownBot.m_flHeadfakeYaw : -m_tKlownBot.m_flHeadfakeYaw;
+	Math::ClampAngles(vWishAngles);
+
+	if (RandomSpin.Value && m_tKlownBot.m_flSpinUntil <= flNow && SDK::RandomInt(1, 600) == 1)
+		m_tKlownBot.m_flSpinUntil = flNow + 0.29f;
+
+	if (RandomSpin.Value && flNow < m_tKlownBot.m_flSpinUntil)
+	{
+		pCmd->viewangles.y += 10.f;
+		Math::ClampAngles(pCmd->viewangles);
+	}
+	else
+	{
+		Vec3 vDelta = vWishAngles - pCmd->viewangles;
+		vDelta.x = Math::NormalizeAngle(vDelta.x);
+		vDelta.y = Math::NormalizeAngle(vDelta.y);
+		pCmd->viewangles.x += vDelta.x * AimSpeed.Value;
+		pCmd->viewangles.y += vDelta.y * AimSpeed.Value;
+		Math::ClampAngles(pCmd->viewangles);
+	}
+
+	const bool bOnGround = pLocal->OnSolid();
+	if (!bOnGround && AirStrafe.Value)
+	{
+		if (m_tKlownBot.m_bWasOnGround)
+			m_tKlownBot.m_flAirborneSince = flNow;
+
+		pCmd->buttons |= IN_DUCK;
+		if (flNow - m_tKlownBot.m_flAirborneSince >= 0.33f)
+		{
+			Vec3 vToTarget = pTarget->GetAbsOrigin() - pLocal->GetAbsOrigin();
+			vToTarget.z = 0.f;
+			Vec3 vRight{};
+			Math::AngleVectors(pCmd->viewangles, nullptr, &vRight, nullptr);
+			vRight.z = 0.f;
+			if (vToTarget.Normalize() > 0.01f && vRight.Normalize() > 0.01f)
+			{
+				const bool bTargetRight = vRight.Dot(vToTarget) > 0.f;
+				pCmd->forwardmove = 0.f;
+				pCmd->sidemove = bTargetRight ? 450.f : -450.f;
+				pCmd->viewangles.y += bTargetRight ? 2.5f : -2.5f;
+				Math::ClampAngles(pCmd->viewangles);
+			}
+		}
+	}
+	else if (bOnGround && !m_tKlownBot.m_bWasOnGround)
+	{
+		m_tKlownBot.m_flLandDuckUntil = flNow + 0.10f;
+	}
+
+	if (flNow < m_tKlownBot.m_flLandDuckUntil)
+		pCmd->buttons |= IN_DUCK;
+	m_tKlownBot.m_bWasOnGround = bOnGround;
+
+	if (AutoStab.Value && G::CanPrimaryAttack && flNow >= m_tKlownBot.m_flStabCooldown &&
+		pWeapon->GetWeaponID() == TF_WEAPON_KNIFE && pWeapon->As<CTFKnife>()->m_bReadyToBackstab())
+	{
+		pCmd->buttons |= IN_ATTACK;
+		m_tKlownBot.m_flStabCooldown = flNow + 0.8f;
+	}
+}
+
 void CBotUtils::Reset()
 {
 	m_mAutoScopeCache.clear();
@@ -441,4 +584,5 @@ void CBotUtils::Reset()
 	m_vPredictedJumpPos = {};
 	m_vJumpPeakPos = {};
 	InvalidateLLAP();
+	m_tKlownBot = {};
 }

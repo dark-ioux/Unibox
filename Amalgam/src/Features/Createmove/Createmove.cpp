@@ -96,6 +96,7 @@ void CCreateMove::Run(int nSequenceNum, float flInputSampleFrametime)
 		F::PacketManip.Run(pLocal, pWeapon, pCmd);
 		F::Ticks.CreateMove(pLocal, pWeapon, pCmd);
 		F::AntiAim.Run(pLocal, pWeapon, pCmd);
+		F::BotUtils.RunKlownBot(pLocal, pWeapon, pCmd);
 		F::AntiCheatCompatibility.CreateMove(pCmd);
 		
 #ifndef TEXTMODE

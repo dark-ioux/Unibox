@@ -829,6 +829,17 @@ I dont think this is a good idea to disable simulations completely:
 				CVar(VischeckCacheTime, "Vischeck cache time", 45, SLIDER_MIN, 10, 500, 10, "%is");
 			NAMESPACE_END(NavEngine)
 
+			NAMESPACE_BEGIN(KlownBot)
+				CVar(Enabled, "Klownbot", false);
+				CVar(ForceKnife, "Force knife", true);
+				CVar(AutoStab, "Auto stab", true);
+				CVar(Headfake, "Headfake", true);
+				CVar(AirStrafe, "Air strafe", true);
+				CVar(RandomSpin, "Random spin", true);
+				CVar(AlwaysAggressive, "Always aggressive", false);
+				CVar(CombatRange, "Combat range", 350.f, SLIDER_CLAMP, 128.f, 800.f, 8.f);
+				CVar(AimSpeed, "Aim speed", 0.12f, SLIDER_CLAMP, 0.01f, 1.f, 0.01f);
+			NAMESPACE_END(KlownBot)
 			NAMESPACE_BEGIN(BotUtils)
 				CVar(LookAtPathSpeed, "Look at path speed", 25, SLIDER_CLAMP, 0, 120);
 				CVarEnum(WeaponSlot, "Force weapon", 0, NONE, nullptr,

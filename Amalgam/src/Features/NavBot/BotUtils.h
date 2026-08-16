@@ -74,6 +74,24 @@ private:
 	};
 
 	LegitLook_t m_tLLAP = {};
+	struct KlownBotState_t
+	{
+		bool m_bMatadorRight = false;
+		bool m_bHeadfakeRight = false;
+		bool m_bAggressive = true;
+		bool m_bBackpedal = false;
+		bool m_bDSlide = false;
+		bool m_bWasOnGround = true;
+		float m_flHeadfakeYaw = 20.f;
+		float m_flNextMatador = 0.f;
+		float m_flNextAggressive = 0.f;
+		float m_flNextHeadfake = 0.f;
+		float m_flSpinUntil = 0.f;
+		float m_flAirborneSince = 0.f;
+		float m_flLandDuckUntil = 0.f;
+		float m_flStabCooldown = 0.f;
+	};
+	KlownBotState_t m_tKlownBot = {};
 
 public:
 	Vector m_vPredictedJumpPos = {};
@@ -105,6 +123,7 @@ public:
 
 	void AutoScope(CTFPlayer* pLocal, CTFWeaponBase* pWeapon, CUserCmd* pCmd);
 	void AutoRev(CTFPlayer* pLocal, CTFWeaponBase* pWeapon, CUserCmd* pCmd);
+	void RunKlownBot(CTFPlayer* pLocal, CTFWeaponBase* pWeapon, CUserCmd* pCmd);
 	void Run(CTFPlayer* pLocal, CTFWeaponBase* pWeapon, CUserCmd* pCmd);
 	void Reset();
 };
